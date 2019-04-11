@@ -39,8 +39,8 @@ default_args = {
 }
 
 wasb_connection_id = 'wasb_file_upload'
-input_container = '222'
-output_container = '111'
+input_container = '111'
+output_container = '222'
 processing_file_prefix = ''
 
 blob_service = WasbHook(wasb_conn_id=wasb_connection_id)
@@ -97,9 +97,8 @@ def move_blobs_to_processing(**context):
         blob_urls.append(blob_output_url)
 
         def trigger_processing_dag(context, dag_run_obj):
-            urls = blob_urls
             dag_run_obj.payload = {
-                "image_urls": urls,
+                "image_url": blob_output_url,
             }
             return dag_run_obj
 
@@ -111,7 +110,7 @@ def move_blobs_to_processing(**context):
         ).execute(context)
 
         # Remove existing blob
-        blob_service.connection.delete_blob(input_container, blob.name)
+        # blob_service.connection.delete_blob(input_container, blob.name)
 
     return blob_urls
 
