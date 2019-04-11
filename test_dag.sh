@@ -7,11 +7,11 @@ source ./env_shared.sh
 source ./env_setup.private.sh
 
 # # Test it loads
-python ./dags/$DAG_NAME.py
+python ./dags/$DAG.py
 
 # # List tree
-airflow list_tasks $DAG_NAME --tree
+airflow list_tasks $DAG --tree
 
 # # Test print file found
-airflow test $DAG_NAME python_op_file_found 2015-06-01
+airflow test $DAG $TASK 2015-06-01
 

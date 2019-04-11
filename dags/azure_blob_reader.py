@@ -3,9 +3,11 @@ from datetime import timedelta
 import airflow
 from airflow import DAG
 from airflow.operators.bash_operator import BashOperator
+from airflow.operators.dagrun_operator import TriggerDagRunOperator
 from airflow.contrib.sensors.wasb_sensor import WasbPrefixSensor
 from airflow.contrib.hooks.wasb_hook import WasbHook
 from azure.storage.blob.models import Blob, BlobPermissions
+from airflow.operators.subdag_operator import SubDagOperator
 import datetime
 
 
@@ -37,8 +39,9 @@ default_args = {
 }
 
 wasb_connection_id = 'wasb_file_upload'
-input_container = 'uploaded'
-output_container = 'processing'
+input_container = '222'
+output_container = '111'
+processing_file_prefix = ''
 
 blob_service = WasbHook(wasb_conn_id=wasb_connection_id)
 
@@ -51,42 +54,73 @@ dag = DAG(
 
 new_files = WasbPrefixSensor(
     task_id='new_files_sensor',
-    container_name=output_container,
-    prefix='new_',
+    container_name=input_container,
+    prefix=processing_file_prefix,
     wasb_conn_id=wasb_connection_id,
     dag=dag,
 )
 
 
-def print_context(**context):
-    results = blob_service.connection.list_blobs('uploaded', 'new_')
+def move_blobs_to_processing(**context):
+    results = blob_service.connection.list_blobs(
+        input_container, processing_file_prefix)
     blobs_moved = 0
+    blob_urls = []
     for blob in results:
-        print("\t Blob name: " + blob.name)        
+        print("\t Blob name: " + blob.name)
         # Generate a SAS token for blob access
-        blob_source_url = blob_service.connection.make_blob_url(
+        blob_input_url = blob_service.connection.make_blob_url(
             input_container,
             blob.name,
             sas_token=blob_service.connection.generate_blob_shared_access_signature(
                 input_container,
                 blob.name,
-                permission=BlobPermissions(read=True), 
-                expiry=datetime.datetime.utcnow() + datetime.timedelta(hours=1)))
+                permission=BlobPermissions(read=True),
+                expiry=datetime.datetime.utcnow() + datetime.timedelta(days=5)))
 
-        print("\t SAS URL:{}".format(blob_source_url))
+        print("\t SAS URL:{}".format(blob_input_url))
         # Copy blob to processing bucket
         blob_service.connection.copy_blob(
-            output_container, blob.name, blob_source_url, requires_sync=True)
-        
-        blobs_moved += 1
+            output_container, blob.name, blob_input_url, requires_sync=True)
 
-    return "Moved {} blobs for processing".format(blobs_moved)
+        # Generate a SAS token the now moved blob for downstream dags
+        blob_output_url = blob_service.connection.make_blob_url(
+            input_container,
+            blob.name,
+            sas_token=blob_service.connection.generate_blob_shared_access_signature(
+                input_container,
+                blob.name,
+                permission=BlobPermissions(read=True),
+                expiry=datetime.datetime.utcnow() + datetime.timedelta(hours=1)))
+
+        blobs_moved += 1
+        blob_urls.append(blob_output_url)
+
+        def trigger_processing_dag(context, dag_run_obj):
+            urls = blob_urls
+            dag_run_obj.payload = {
+                "image_urls": urls,
+            }
+            return dag_run_obj
+
+        TriggerDagRunOperator(
+            task_id="trigger_processing",
+            trigger_dag_id="image_processing",
+            python_callable=trigger_processing_dag,
+            dag=dag
+        ).execute(context)
+
+        # Remove existing blob
+        blob_service.connection.delete_blob(input_container, blob.name)
+
+    return blob_urls
 
 
 python_task = PythonOperator(
-    task_id='python_op_file_found',
-    python_callable=print_context,
+    task_id='move_blobs',
+    python_callable=move_blobs_to_processing,
     dag=dag,
 )
+
 
 new_files >> python_task

@@ -25,4 +25,4 @@ Now drop a file into the container `uploaded` in the blob storage and see the wo
 
 ### Developing 
 
-When editing the `DAG` you can use `DAG_NAME=azure_blob_reader ./test_dag.sh` to check for any python language issues before running in Airflow 
+When editing the `DAG` you can use `DAG=azure_blob_reader TASK=move_blobs ./test_dag.sh` to check for any python language issues before running in Airflow 
