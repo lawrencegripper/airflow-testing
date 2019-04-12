@@ -1,16 +1,10 @@
-from datetime import timedelta
-
+from datetime import timedelta, datetime
 import airflow
 from airflow import DAG
-from airflow.operators.bash_operator import BashOperator
 from airflow.operators.dagrun_operator import TriggerDagRunOperator
 from airflow.contrib.sensors.wasb_sensor import WasbPrefixSensor
 from airflow.contrib.hooks.wasb_hook import WasbHook
-from azure.storage.blob.models import Blob, BlobPermissions
-from airflow.operators.subdag_operator import SubDagOperator
-import datetime
-
-
+from azure.storage.blob.models import BlobPermissions
 from airflow.operators.python_operator import PythonOperator
 
 # These args will get passed on to each operator
@@ -76,7 +70,7 @@ def move_blobs_to_processing(**context):
                 input_container,
                 blob.name,
                 permission=BlobPermissions(read=True),
-                expiry=datetime.datetime.utcnow() + datetime.timedelta(days=5)))
+                expiry=datetime.utcnow() + timedelta(days=5)))
 
         print("\t SAS URL:{}".format(blob_input_url))
         # Copy blob to processing bucket
@@ -85,13 +79,13 @@ def move_blobs_to_processing(**context):
 
         # Generate a SAS token the now moved blob for downstream dags
         blob_output_url = blob_service.connection.make_blob_url(
-            input_container,
+            output_container,
             blob.name,
             sas_token=blob_service.connection.generate_blob_shared_access_signature(
-                input_container,
+                output_container,
                 blob.name,
                 permission=BlobPermissions(read=True),
-                expiry=datetime.datetime.utcnow() + datetime.timedelta(hours=1)))
+                expiry=datetime.utcnow() + timedelta(hours=1)))
 
         blobs_moved += 1
         blob_urls.append(blob_output_url)
@@ -110,13 +104,13 @@ def move_blobs_to_processing(**context):
         ).execute(context)
 
         # Remove existing blob
-        # blob_service.connection.delete_blob(input_container, blob.name)
+        blob_service.connection.delete_blob(input_container, blob.name)
 
     return blob_urls
 
 
 python_task = PythonOperator(
-    task_id='move_blobs',
+    task_id='start',
     python_callable=move_blobs_to_processing,
     dag=dag,
 )

@@ -2,18 +2,11 @@ from datetime import timedelta
 
 import airflow
 from airflow import DAG
-from airflow.operators.dummy_operator import DummyOperator
-from airflow.contrib.sensors.wasb_sensor import WasbPrefixSensor
-from airflow.contrib.hooks.wasb_hook import WasbHook
-from azure.storage.blob.models import Blob, BlobPermissions
-from airflow.operators.subdag_operator import SubDagOperator
-import datetime
 from airflow.operators.python_operator import PythonOperator
 
 from msrest.authentication import CognitiveServicesCredentials
 from azure.cognitiveservices.vision.computervision import ComputerVisionClient
-from azure.cognitiveservices.vision.computervision.models import TextRecognitionMode
-from azure.cognitiveservices.vision.computervision.models import TextOperationStatusCodes
+from cognitive_services_hook import CognitiveServicesHook
 
 # These args will get passed on to each operator
 # You can override them on a per-task basis during operator initialization
@@ -35,25 +28,27 @@ dag = DAG(
     description='Process images',
 )
 
+cog_hook = CognitiveServicesHook(conn_id="cog_services_ocr")
+
 
 def cognitive_text_lookup(ds, **kwargs):
     image_sas_url = kwargs['dag_run'].conf['image_url']
     print("Submitting image image {}".format(image_sas_url))
 
-    client = ComputerVisionClient(endpoint="https://uksouth.api.cognitive.microsoft.com/", credentials=CognitiveServicesCredentials("__KEY_HERE__"))
-    result = client.recognize_printed_text(image_sas_url, custom_headers=None)
+    result = cog_hook.recognize_printed_text(image_sas_url)
 
     print("Found {} regions".format(len(result.regions)))
     print("Found lines in region 0")
-        
-    lines = result.regions[0].lines
-    print("Recognized:\n")
-    for line in lines:
-        line_text = " ".join([word.text for word in line.words])
-    print(line_text)
+
+    for region in result.regions:
+        print("Recognized:\n")
+        for line in region.lines:
+            line_text = " ".join([word.text for word in line.words])
+            print(line_text)
+
 
 cognitive_text = PythonOperator(
-    task_id='cognitive_text',
+    task_id='start',
     provide_context=True,
     python_callable=cognitive_text_lookup,
     dag=dag,
