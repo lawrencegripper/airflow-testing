@@ -15,9 +15,10 @@ source venv/bin/activate
 # To avoid this dependency set SLUGIFY_USES_TEXT_UNIDECODE=yes in your environment when you install or upgrade Airflow. 
 # To force installing the GPL version set AIRFLOW_GPL_UNIDECODE
 export SLUGIFY_USES_TEXT_UNIDECODE=yes
-pip install apache-airflow[all]
+pip install apache-airflow[postgres]
 # Add blob dependency 
 pip install azure-storage-blob
+pip install azure-cognitiveservices-vision-computervision
 
 # initialize the database
 airflow initdb
