@@ -22,15 +22,15 @@ dag = DAG(
 
 start = DummyOperator(
     task_id='start',
-    default_args=args,
     dag=dag,
+    default_args=args,
 )
 
 
 def trigger_processing_dag(context, dag_run_obj):
     # Trigger with test image
     dag_run_obj.payload = {
-        "image_url": "https://lgairflowinput.blob.core.windows.net/222/json.png?st=2019-04-12T10%3A22%3A00Z&se=2019-04-15T15%3A22%3A00Z&sp=rl&sv=2018-03-28&sr=b&sig=N3MJg%2Fge9S8sxgaDH962Jnqcffd%2BYWVvgY7vGZmAwGw%3D",
+        "image_url": "https://proxy.duckduckgo.com/iu/?u=http%3A%2F%2Fwww.gpwebsolutions-host.co.uk%2F1400%2Ffiles%2F2014%2F02%2Fprescription1.jpg&f=1",
     }
     return dag_run_obj
 
