@@ -7,7 +7,7 @@ source ./env_shared.sh
 source ./env_setup.private.sh
 
 # # Test it loads
-python ./dags/$DAG.py
+python ./$DAG.py
 
 # # List tree
 airflow list_tasks $DAG --tree
